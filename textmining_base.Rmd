@@ -1,0 +1,636 @@
+---
+title: "Text Mining"
+params:
+  answers: true
+mainfont: Arial
+fontsize: 12pt
+urlcolor: blue
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: paper
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+
+# Introduction
+
+During this practical, we will cover an introduction to text mining, this will include how to pre-process mined text, different ways to visualize this the mined text and an introduction to one type of analysis you can conduct during text mining: sentiment analysis. As a whole, there are multiple different ways to analysis mine & analyze text within `R` however for this practical we will be focused on the techniques covered in the `tidytext` package, based upon the `tidyverse`. 
+
+For this practical, you will need the following packages:
+
+```{r packages, message = FALSE, warning = FALSE, error = FALSE}
+# General Packages
+    library(tidyverse)
+
+# Text Mining
+    library(tidytext)
+    library(gutenbergr)
+    library(SnowballC)
+    library(wordcloud)
+    library(textdata)
+```
+
+For this practical, we will be using text mined through the [Gutenberg Project](<https://www.gutenberg.org/wiki/Main_Page>); briefly this project contains over 60,000 freely accessible eBooks, which through the package `gutenberger`, can be easily accessed and perfect for text mining and analysis. 
+
+During this practical, we will be looking at several books from the late 1800s, in the mindset to compare and contrast the use of language within them. These books include:
+
+- *Alice's Adventures in Wonderland by Lewis Carroll*
+- *The Picture of Dorian Gray by Oscar Wilde*
+- *Dracula by Bram Stoker*
+- *The Strange Case of Dr. Jekyll and Mr. Hyde by Robert Louis Stevenson*
+
+Despite being from the late 1800s, these books still are popular and hold cultural significance in TV, Movies and the English Language. To access this novel suitable for this practical the following function should be used:
+
+```{r, message = FALSE}
+
+AAIWL <- gutenberg_download(28885) # 28885 is the eBook number of Alice in Wonderland
+PODG <- gutenberg_download(174) # 174 is the eBook number of The Picture of Dorian Gray
+Drac <- gutenberg_download(345) # 345 is the eBook number of Dracula
+SCJH <- gutenberg_download(43) # 43 is the eBook number of Dr. Jekyll and Mr. Hyde
+
+```
+
+After having loaded all of these books into your working directory (using the code above), examine one of these books using the `View()` function. When you view any of these data frames, you will see that these have an extremely *messy* layout and structure. As a result of this complex structure means that conducting *any* analysis would be extremely challenging, so pre-processing must be undertaken to get this into a format which is usable. 
+
+---
+
+# Pre-Processing Text
+
+In order for text to be used effectively within statistical processing and analysis; it must be pre-processed so that it can be uniformly examined. In general the major steps of pre-processing include:
+
+- Removing numbers 
+- Removing capital letters
+- Removing stop words
+- Removing inter-punctuation 
+- Application of a Stemming Algorithm
+
+These steps are important as this allows the text to be presented uniformly for analysis; within this practical we will discuss how to undergo each of these steps using the `tidytext` package. 
+
+## Step 1, Un-nesting Text
+
+When we previously looked at this text, as we discovered it was extremely *messy* with it being attached one line per row in the data frame. As such, it is important to un-nest this text so that it attaches one word per row. 
+
+Before doing this, it is useful to make a note of aspects such as the line which text is on, and the chapter each line falls within. This can be important when examining anthologies or making chapter comparisons as this can be specified within the analysis. 
+
+In order to specify the line number and chapter of the text, it is possible to use the `mutuate` function from the `dplyr` package. 
+
+---
+
+**Question 1. Apply the code below, which uses the `mutate` function, to add line numbers and chapter references one of the books, before using the `View()` function on outcome to examine how this has changed the structure.**
+
+```{r, eval = FALSE}
+
+# Template: 
+
+tidy_[BOOKNAME] <- [BOOKNAME] %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE))))
+
+```
+
+```{r, eval = TRUE, include = params$answers}
+
+# Answers
+
+tidy_AAIWL <- AAIWL %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE))))
+tidy_PODG <- PODG %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE))))
+
+tidy_Drac <- Drac %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE))))
+
+tidy_SCJH <- SCJH %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE))))
+
+```
+
+```{r, eval = FALSE, include = params$answers}
+View(tidy_AAIWL)
+View(tidy_PODG)
+View(tidy_Drac)
+View(tidy_SCJH)
+```
+
+---
+
+From this, it is now possible to pass the function `unnest_tokens()` in order to split apart the sentence string, and apply each word to a new line. When using this function, you simply need to pass the arguments, `word` (as this is what you want selecting) and `text` (what column you want to unnest). 
+
+---
+
+**Question 2. Apply unnest_tokens to your tidied book to unnest this text, before once again using the `View()` function to examine the output.**
+
+Hint: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL <- tidy_AAIWL %>%
+  unnest_tokens(word, text)
+
+tidy_PODG <- tidy_PODG %>%
+  unnest_tokens(word, text)
+
+tidy_Drac <- tidy_Drac %>%
+  unnest_tokens(word, text)
+
+tidy_SCJH <- tidy_SCJH %>%
+  unnest_tokens(word, text)
+```
+
+---
+
+This will now have resulted in one word being linked per row of the data frame `tidy_AAIWL`. The benefit of using the `tidytext` package in comparison to other text mining packages, is that this automatically applies some of the basic steps to pre-process your text, including removing of capital letters, inter-word punctuation and numbers. However additional pre-processing is required.
+
+---
+
+## Step 2, Stemming Algorithms 
+
+As a whole languages are complicated, and this is definitely including the English Language. When examining language outside of a text mining situation, we are all aware that words such as *violet*, *plum* and *orchid* all are shades of the colour purple. And this is also seen within other words such as *going* and *gone* being different tenses of the word *to go*. This understanding is important when it comes to text mining because without specifically indicating these links a program may not be able to recognize the semantic similarities between these words. 
+
+Therefore within the process of text mining, this can be achieved through the application of a Stemming Algorithm. This converts all presented words to their base, so for example in the case of *going* and *gone* these would be converted to the word *go*. Although there are multiple different stemming algorithms which can be used, the most common is [Porter's Algorithm](<http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.848.7219&rep=rep1&type=pdf>), although there is a lot of debate between which method is best and most appropriate, due to its popularity within text mining we will be focusing on this Algorithm. 
+
+In order to to apply Porter's algorithm to the presented text, we use the function `wordStem()` from the `SnowballC` package. This similarly to other functions, can be simply applied to all the individual words in the unnested document. 
+
+---
+
+**Question 3. Use the function `wordStem()` from the package `SnowballC` in order to apply Porter's Algorithm to the data frame `tidy_AAIWL`.**
+
+Hint: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function, and mutate the column `word` to apply the stem correctly.
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL <- tidy_AAIWL %>%
+  mutate(word = wordStem(word))
+
+tidy_PODG <- tidy_PODG %>%
+  mutate(word = wordStem(word))
+
+tidy_Drac <- tidy_Drac %>%
+  mutate(word = wordStem(word))
+
+tidy_SCJH <- tidy_SCJH %>%
+  mutate(word = wordStem(word))
+```
+
+---
+
+Before moving onto examining the removal of stop words, as mentioned there is a large amount of debate around stemming algorithms and which is most effective, with many (including Porter's) reducing some words to non-sensical words. This although may not be an issue, may impact the interpretation of results if you (or others) are unable to understand what words are. If you are interested in learning more, a nice overview can be found [here](<https://www.geeksforgeeks.org/introduction-to-stemming/>) which provides an overview and comparison of different algorithms. 
+
+
+## Step 3, Removing Stop Words. 
+
+As discussed within the lecture, stop words are words in any language which have little or no meaning, and simply connect the words of important. Such as *the*, *a*, *also*, *as*, *were*... etc. To understand the importance of removing these stop words, we can simply do a comparison between the text which has had them removed and those which have not been. 
+
+So firstly, lets learn how to remove them; to remove them, we use the function `anti_join()`. This function words through *un-joining* this table based upon the components, which when passed with the argument `stop_words`, which is a table containing these words across three lexicons. This removes all the stop words from the presented data frame. 
+
+---
+
+**Question 4. Use the function `anti_join()` to remove stop words from your tidied text attaching it to a new data frame.**
+
+Hint: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
+
+```{r, eval = TRUE, include = params$answers, message = FALSE, error = FALSE}
+tidy_AAIWL.2 <- tidy_AAIWL %>%
+  anti_join(stop_words)
+
+tidy_PODG.2 <- tidy_PODG %>%
+  anti_join(stop_words)
+
+tidy_Drac.2 <- tidy_Drac %>%
+  anti_join(stop_words)
+
+tidy_SCJH.2 <- tidy_SCJH %>%
+  anti_join(stop_words)
+```
+
+---
+
+Now in order to examine the impact of removing these filler words, we can use the `count()` function to examine the frequencies of different words. This when sorted, will produce a table of frequencies in descending order.
+
+---
+
+**Question 5. Use the function `count()` to compare the frequencies of words in the data frames `tidy_AAIWL` and `tidy_AAIWL.2`, do you notice a difference in the top 10 words which most commonly occur in the text?**
+
+Hint: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL %>%
+  count(word, sort = TRUE)
+
+tidy_AAIWL.2 %>%
+  count(word, sort = TRUE)
+
+tidy_PODG %>%
+  count(word, sort = TRUE)
+
+tidy_PODG.2 %>%
+  count(word, sort = TRUE)
+
+tidy_Drac %>%
+  count(word, sort = TRUE)
+
+tidy_Drac.2 %>%
+  count(word, sort = TRUE)
+
+tidy_SCJH %>%
+  count(word, sort = TRUE)
+
+tidy_SCJH.2 %>%
+  count(word, sort = TRUE)
+
+# The main difference seen is that stop words occur far more frequently, 
+  # than any content based words. 
+```
+
+---
+
+
+## Step 4. Additional Pre-Processing
+
+So far, you have examined different ways of processing the actual text within the data itself and preparing this for analysis. Before moving on to visualizing and analyzing this text in more detail, it should be commented that at times, additional processing, such as section removal is required. In our case, if you have taken time to review the the text documents at the beginning, you will have seen there is an initial pre-text, other irrelevant details which are not required for an analysis, and although these are unlike to influence analyses which are based on frequencies, if other analyses are conducted it could impact your findings. As such it can be important to remove them. 
+
+In order to filter your data, the `filter()` functions previously discussed in Week 7 (Interactive Data Visualization) and Basics of dplyr, can be used. In our case, you will want to use this function to remove all data which is contained within *Chapter 0*, which is before the novel actually begins. 
+
+---
+
+**Question 6. Using the `filter()` function, in addition to your knowledge of dplyr, remove Chapter 0 from your tidied text.**
+
+Hint: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
+Note: Jekyll and Hyde does not have multiple chapters, so skip this step for this text.
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL.2 <- tidy_AAIWL.2 %>%
+  filter(chapter != 0)
+
+tidy_PODG.2 <- tidy_PODG.2 %>%
+  filter(chapter != 0)
+
+tidy_Drac.2 <- tidy_Drac.2 %>%
+  filter(chapter != 0)
+
+```
+
+---
+
+---
+
+# Visualising Mined Text
+
+---
+
+When it comes to visualizing text output, there are multiple methods which can be effective. A majority of these are based upon the frequency of these words, within this practical we will be looking at Word Frequency Bar Charts and Word Clouds.
+
+## Word Frequency Bar Charts 
+
+One way of visualizing the frequency of different words is through a word frequency bar chart. To plot these charts, it is easiest (and often most effective) to do so through `ggplot`. Before you are able to plot the frequencies in `ggplot` some processing must be undertaken. 
+
+Firstly similar to Question 5, you should count the word frequencies, before filtering out the top scoring word in the text. 
+
+---
+
+**Question 7. Create a new variable, which is made up of the frequencies of words from the tidied text, which contains only words with a frequency over 50. Additionally using the `mutate()` function to reorder the variable in order of frequency.**
+
+Hint: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
+
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL.count <- tidy_AAIWL.2 %>%
+    count(word, sort = TRUE) %>%
+    filter(n > 50) %>% 
+    mutate(word = reorder(word, n))
+
+tidy_PODG.count <- tidy_PODG.2 %>%
+    count(word, sort = TRUE) %>%
+    filter(n > 50) %>%
+    mutate(word = reorder(word, n))
+
+tidy_Drac.count <- tidy_Drac.2 %>%
+    count(word, sort = TRUE) %>%
+    filter(n > 50) %>%
+    mutate(word = reorder(word, n))
+
+tidy_SCJH.count <- tidy_SCJH.2 %>%
+    count(word, sort = TRUE) %>%
+    filter(n > 50) %>%
+    mutate(word = reorder(word, n))
+```
+
+---
+
+From these new variables, you can use `ggplot()` with the `geom_col()` function to create this frequency word plot. 
+
+---
+
+**Question 8. Using `ggplot()` function  using `geom_col()` create a frequency plot for the words which occur more than 50 times in the text.**
+
+Use the function `coord_flip()`, to flip this on the axis. 
+
+```{r, eval = TRUE, include = params$answers}
+  ggplot(data = tidy_AAIWL.count, mapping = aes(word, n)) +
+          geom_col() +
+          xlab(NULL) +
+          coord_flip()
+
+  ggplot(data = tidy_PODG.count, mapping = aes(word, n)) +
+          geom_col() +
+          xlab(NULL) +
+          coord_flip()
+  
+  ggplot(data = tidy_Drac.count, mapping = aes(word, n)) +
+          geom_col() +
+          xlab(NULL) +
+          coord_flip()
+  
+  ggplot(data = tidy_SCJH.count, mapping = aes(word, n)) +
+          geom_col() +
+          xlab(NULL) +
+          coord_flip()
+```
+
+---
+
+---
+
+## Word Clouds 
+
+---
+
+Another way to visualize the frequency and occurrence of words in texts is through word clouds. Typically these word clouds can display the most words through their size, with the largest words indicating the most common words. 
+
+To plot word clouds, you once again use the frequency data frame as created in Question 7. This can be passed through the function `wordcloud()` (using the pipe (`%>%`) operators), to create a word cloud. 
+
+---
+
+**Question 9. Using the `wordcloud()` function, create a word cloud for your tided text.**
+
+Hint: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
+Note: Ensure to use the function `with()`, is used after the piping operator. 
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL.count %>%
+     with(wordcloud(word, n, max.words = 100))
+
+tidy_PODG.count %>%
+     with(wordcloud(word, n, max.words = 100))
+
+tidy_Drac.count %>%
+     with(wordcloud(word, n, max.words = 100))
+
+tidy_SCJH.count %>% 
+  with(wordcloud(word, n, max.words = 100))
+```
+
+---
+
+---
+
+**Question 10. Discuss with another individual or group, whether you can tell what text each word clouds come from, based on the popular words which occur**
+
+---
+
+---
+
+# Analysing Mined Text: Sentiment Analysis
+
+Beyond simply understanding how frequently words occur within text, it is possible to conduct analysis which examines the sentiment of the text. When considering the sentiment of any text it can be used to examine emotions, such as Happy vs Sad, or the association of words with traits such as Good vs Bad. This sentiment analysis can be put to good use when attempting to classify text, whether classifying tweets, blog posts or emails (to determine their content or whether they are Spam). For this practical however, we will focus upon the foundations of sentiment analysis, and whether we can use it to determine what text occurs from the books we have discussed. 
+
+Similar to `stop words` and Stemming Algorithms, sentiment analysis is based upon pre-existing dictionaries and methods. Each which have their benefits, the three covered within the recommended reading are `AFINN`, `bing` and `nrc`. Each of these as discussed in the book provides a different analysis of the sentiment in the text. For this practical we will focus on the `nrc` and `AFINN` dictionaries.
+
+Before we conduct a sentiment analysis, let us examine what exists in these dictionaries. 
+
+---
+
+**Question 11. Using the function `get_sentiments()` passing the argument "afinn" or "nrc" to explore the assignment of values to words.**
+
+Note: to access these lexicons you will need to install the package `textdata` as well as the dictionaries fully. 
+
+```{r, eval = FALSE, include = params$answers}
+
+get_sentiments("afinn")
+
+get_sentiments("nrc")
+
+```
+
+---
+
+Here you can see the main differences between these dictionaries, with `afinn` assigning a value between -5 to +5 indicating the sentiment from negative (-5) to positive (+5). Whereas `nrc` simply classifies the words by a singular emotion. 
+
+Given the size of these dictionaries, it is often more effective to conduct a sentiment analysis without having passed any stemming algorithm, especially as you have seen in the case of Porter's algorithm were pseudo words are made. 
+
+---
+
+**Question 12. Re-Run the previous steps to pre-process the data without using a stemming algorithm.**
+
+Note: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
+
+```{r, eval = TRUE, include = params$answers}
+
+tidy_AAIWL.3 <- AAIWL %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE)))) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words) %>%
+  filter(chapter != 0)
+
+tidy_PODG.3 <- PODG %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE)))) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words) %>%
+  filter(chapter != 0)
+
+tidy_Drac.3 <- Drac %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE)))) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words) %>%
+  filter(chapter != 0)
+
+tidy_SCJH.3 <- SCJH %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+                                                 ignore_case = TRUE)))) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)
+
+```
+
+---
+
+Now that you have a data set which is prepared for sentiment analysis; we can begin the process of conducting a sentiment analysis. 
+
+When conducted a sentiment analysis two methods can be used, to begin is with the `nrc` dictionary, the second we can use the `afinn` dictionary.
+
+## Method 1: `nrc` 
+
+### Step 1: Select Sentiment Focus
+
+Before beginning any analysis with `nrc`, a focus of the sentiment analysis should be selected. By selecting a focus, this means selecting an emotion which you wish to examine, let us first consider `fear`. To do this you simply need to `filter()` the sentiment to "fear". 
+
+---
+
+**Question 13. Filter the `nrc` dictionary, to only be listed with the "fear" terms, assigning this to the variable list `nrc_fear`.**
+
+```{r, eval = TRUE, include = params$answers}
+nrc_fear <- get_sentiments("nrc") %>%
+  filter(sentiment == "fear")
+```
+
+---
+
+### Step 2: Filtering the Focus
+
+From this you can use the `inner_join()` function passing the argument `nrc_fear` to isolate only the words on this list. 
+
+---
+
+**Question 14. Using the `inner_join()` and `count()` functions to create a list of the fear words and their frequencies within your tided text.**
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL.3 %>% 
+  inner_join(nrc_fear) %>%
+  count(word, sort = TRUE)
+
+tidy_PODG.3 %>% 
+  inner_join(nrc_fear) %>%
+  count(word, sort = TRUE)
+
+tidy_Drac.3 %>% 
+  inner_join(nrc_fear) %>%
+  count(word, sort = TRUE)
+
+tidy_SCJH.3 %>% 
+  inner_join(nrc_fear) %>%
+  count(word, sort = TRUE)
+```
+
+---
+
+### Step 3: Comparing Sentiment Components 
+
+---
+
+**Question 15. In your groups, discuss the differences in frequencies of these `fear` base, and re-run questions 13 & 14, with different emotions (for example, "joy" and "fear") and compare the frequencies in these different texts.**
+
+---
+
+## Method 2: `afinn`
+
+### Step 1: Applying Sentiment Ranking 
+
+One method of calculating and visualizing sentiment is through a line calculation and determination of how positive or negative a line is. To do this, the first step is to apply the `afinn` dictionary to the passages, using the `inner_join()` function passing the argument `get_sentiments("afinn")` to assign weights to these values. 
+
+---
+
+**Question 16. Using the combined function: `inner_join(get_sentiments("afinn"))`, apply this to your text to apply the weight to the text.**
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL.3.afinn <- tidy_AAIWL.3 %>% 
+  inner_join(get_sentiments("afinn"))
+
+tidy_PODG.3.afinn <- tidy_PODG.3 %>% 
+  inner_join(get_sentiments("afinn"))
+
+tidy_Drac.3.afinn <- tidy_Drac.3 %>% 
+  inner_join(get_sentiments("afinn"))
+
+tidy_SCJH.3.afinn <- tidy_SCJH.3 %>% 
+  inner_join(get_sentiments("afinn"))
+```
+
+---
+
+From this you can determine the positive or negative ranking per sentence through running the following code:
+
+---
+
+**Question 17. Run the following code for your tided text, to create a weight per line ranking the positive or negative rating**
+
+```{r}
+
+  group_by(linenumber) %>%
+  mutate(sentiments = sum(value)) %>%
+  distinct(linenumber, .keep_all = T)
+
+```
+
+```{r, eval = TRUE, include = params$answers}
+tidy_AAIWL.3.sent <- tidy_AAIWL.3.afinn %>% 
+  group_by(linenumber) %>%
+  mutate(sentiments = sum(value)) %>%
+  distinct(linenumber, .keep_all = T)
+
+tidy_PODG.3.sent <- tidy_PODG.3.afinn %>% 
+  group_by(linenumber) %>%
+  mutate(sentiments = sum(value)) %>%
+  distinct(linenumber, .keep_all = T)
+
+tidy_Drac.3.sent <- tidy_Drac.3.afinn %>% 
+  group_by(linenumber) %>%
+  mutate(sentiments = sum(value)) %>%
+  distinct(linenumber, .keep_all = T)
+
+tidy_SCJH.sent <- tidy_SCJH.3.afinn %>% 
+  group_by(linenumber) %>%
+  mutate(sentiments = sum(value)) %>%
+  distinct(linenumber, .keep_all = T)
+
+
+```
+
+---
+
+### Step 2: Visualising Sentiment 
+
+From this, you can create a graph using `ggplot` to display the the relationship between `linenumber` and `sentiments`. Which will allow you to compare the different sentiments visually across these books. 
+
+---
+
+**Question 18. Using your knowledge of `ggplot()`, plot your tidied text to indicate the sentiments per line.**
+
+```{r, eval = TRUE, include = params$answers}
+
+ggplot(data = tidy_AAIWL.3.sent, mapping = aes(x = linenumber, y = sentiments)) + 
+  geom_col(colour = "blue", show.legend = FALSE)
+
+ggplot(data = tidy_PODG.3.sent, mapping = aes(x = linenumber, y = sentiments)) + 
+  geom_col(colour = "red", show.legend = FALSE)
+
+ggplot(data = tidy_Drac.3.sent, mapping = aes(x = linenumber, y = sentiments)) + 
+  geom_col(colour = "green", show.legend = FALSE)
+
+ggplot(data = tidy_SCJH.sent, mapping = aes(x = linenumber, y = sentiments)) + 
+  geom_col(colour = "orange", show.legend = FALSE)
+
+```
+
+---
+
+### Step 3: Comparing Visualing Sentiments
+
+---
+
+**Question 19. Discuss in groups the differences between the different texts, can you tell which graph comes from which text?**
+
+---
+
+---
+
