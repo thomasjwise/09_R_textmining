@@ -292,13 +292,13 @@ tidy_Drac.2 <- tidy_Drac.2 %>%
 
 ---
 
-When it comes to visualizing text output, there are multiple methods which can be effective. A majority of these are based upon the frequency of these words, within this practical we will be looking at Word Frequency Bar Charts and Word Clouds.
+When it comes to visualizing text output, there are multiple methods which can be effective. A majority of these are based upon the frequency of these words. Within this practical we will be looking at Word Frequency Bar Charts and Word Clouds, both based primarily upon word frequency.
 
 ## Word Frequency Bar Charts 
 
-One way of visualizing the frequency of different words is through a word frequency bar chart. To plot these charts, it is easiest (and often most effective) to do so through `ggplot`. Before you are able to plot the frequencies in `ggplot` some processing must be undertaken. 
+One of the clearest way to visualize the frequency of different words across different documents. As a whole, there are two methods to do this, firstly this is through simply examining the most common words (through a simple `count` method for each document, examining the term frequencies individually) or an term frequency inverse document frequency (*tf-idf*) across all documents. 
 
-Firstly similar to Question 5, you should count the word frequencies, before filtering out the top scoring word in the text. 
+Firstly, we will simply examine the frequency of words within individual documents. This method can be easily completed using `ggplot`. To begin with similar to Question 5, you should count the word frequencies, before filtering out the top scoring word in the text. 
 
 ---
 
@@ -363,6 +363,112 @@ Use the function `coord_flip()`, to flip this on the axis.
 
 ---
 
+The second way to examine word frequency is through an examination where all documents are combined into one data frame. Where both term frequency (*tf*) is combined across all documents which can then be used in combination with the inverse document frequency (*idf*) to determine how importance a word is, in relation to each document within a collection. 
+
+Before all text can be combined, it is important to ensure all data frames are correctly labelled. At this time, if you were to combine all the documents, you would see the main idenifier for words from different texts is the `gutenberg_id`, this although is specific to each text, provides very limited information to anyone viewing these data frames. As such it is important to add the name of the book into each data frame. 
+
+---
+
+**Question 9. Add a column, labeled "book" to the tidied text which simply names the book.**
+
+Hint: This can easily be done through using the operator `$` to define a new column in the data frame before adding the name accordingly.
+
+```{r, eval = TRUE, include = params$answers}
+
+tidy_AAIWL.2$book <- "Alice in Wonderland"
+tidy_Drac.2$book <- "Dracula"
+tidy_PODG.2$book <- "Picture of Dorian Gray"
+tidy_SCJH.2$book <- "Dr. Jekyll and Mr. Hyde"
+
+```
+
+---
+
+---
+
+**Question 10. Swapping your code with others in your group, combine all four tided texts together, into one document called "tidy_text"**
+
+```{r, eval = TRUE, include = params$answers}
+
+tidy_text <- rbind(tidy_AAIWL.2, tidy_Drac.2, tidy_PODG.2, tidy_SCJH.2)
+
+```
+
+---
+
+Now that the books have been combined, you can now examine again the frequency of different words and the total amount of words per book. To do this, after grouping the data frame by book (using the `group_by()` function), you will need to find the frequency of each word, again using the `count()` function. Secondly, you will also need to find the total number of words per book, this can be done simply through the `summarize()` function. Before being combined together to form a new data frame which details the frequency of each word and the total number of overall words per book. Calculating this is important, as this can then be plotted to determine how common highly occurring words are, compared to rare or unique terms. 
+
+---
+
+**Question 11. Using the code template below, create a plot to indicate the Term Frequency Distribution across these books**
+
+```{r, eval = FALSE}
+
+tidy.text.count <- tidy_text %>%
+  group_by(??) %>%
+  count(??, ??, sort = TRUE)
+
+tidy.text.total <- tidy.text.count %>%
+  group_by(??) %>%
+  summarize(total = sum(??)) 
+
+tidy.text.tf <- left_join(tidy.text.count, tidy.text.total)
+
+ggplot(data = tidy.text.tf, mapping = aes(x = (n/total), fill = book)) + 
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.0009) +
+  facet_wrap(~book, ncol = 2, scales = "free_y")
+
+```
+
+```{r, eval = TRUE, include = params$answers}
+
+tidy.text.count <- tidy_text %>%
+  group_by(book) %>% 
+  count(book, word, sort = TRUE)
+
+tidy.text.total <- tidy.text.count %>%
+  group_by(book) %>%
+  summarize(total = sum(n))
+
+tidy.text.tf <- left_join(tidy.text.count, tidy.text.total)
+
+ggplot(tidy.text.tf, aes(n/total, fill = book)) + 
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.0009) +
+  facet_wrap(~book, ncol = 2, scales = "free_y")
+
+```
+
+---
+
+From this, it is then possible to use the function `bind_tf_idf()` to then determine the *tf*, *idf* and *tf_idf* of the data set. 
+
+---
+
+**Question 12. Using the `bind_tf_idf()` function, and the example code in section 3.3 in the recommended reading, [Text Mining with R](<https://www.tidytextmining.com/tfidf.html#term-frequency-in-jane-austens-novels>), plot the `tf_idf` across the books.**
+
+```{r, eval = TRUE, include = params$answers}
+
+tidy.text.tf <- tidy.text.tf %>% 
+  bind_tf_idf(word, book, n)
+
+tidy.text.tf %>%
+  arrange(desc(tf_idf)) %>%
+  mutate(word = factor(word, levels = rev(unique(word)))) %>% 
+  group_by(book) %>% 
+  top_n(15) %>% 
+  ungroup() %>%
+  ggplot(aes(word, tf_idf, fill = book)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = NULL, y = "tf-idf") +
+  facet_wrap(~book, ncol = 2, scales = "free") +
+  coord_flip()
+
+```
+
+---
+
 ---
 
 ## Word Clouds 
@@ -375,7 +481,7 @@ To plot word clouds, you once again use the frequency data frame as created in Q
 
 ---
 
-**Question 9. Using the `wordcloud()` function, create a word cloud for your tided text.**
+**Question 13. Using the `wordcloud()` function, create a word cloud for your tided text.**
 
 Hint: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
 Note: Ensure to use the function `with()`, is used after the piping operator. 
@@ -398,7 +504,7 @@ tidy_SCJH.count %>%
 
 ---
 
-**Question 10. Discuss with another individual or group, whether you can tell what text each word clouds come from, based on the popular words which occur**
+**Question 14. Discuss with another individual or group, whether you can tell what text each word clouds come from, based on the popular words which occur**
 
 ---
 
@@ -414,7 +520,7 @@ Before we conduct a sentiment analysis, let us examine what exists in these dict
 
 ---
 
-**Question 11. Using the function `get_sentiments()` passing the argument "afinn" or "nrc" to explore the assignment of values to words.**
+**Question 15. Using the function `get_sentiments()` passing the argument "afinn" or "nrc" to explore the assignment of values to words.**
 
 Note: to access these lexicons you will need to install the package `textdata` as well as the dictionaries fully. 
 
@@ -434,7 +540,7 @@ Given the size of these dictionaries, it is often more effective to conduct a se
 
 ---
 
-**Question 12. Re-Run the previous steps to pre-process the data without using a stemming algorithm.**
+**Question 16. Re-Run the previous steps to pre-process the data without using a stemming algorithm.**
 
 Note: As with Question 1, ensure to use the piping operator (`%>%`) to easily apply the function.
 
@@ -487,7 +593,7 @@ Before beginning any analysis with `nrc`, a focus of the sentiment analysis shou
 
 ---
 
-**Question 13. Filter the `nrc` dictionary, to only be listed with the "fear" terms, assigning this to the variable list `nrc_fear`.**
+**Question 17. Filter the `nrc` dictionary, to only be listed with the "fear" terms, assigning this to the variable list `nrc_fear`.**
 
 ```{r, eval = TRUE, include = params$answers}
 nrc_fear <- get_sentiments("nrc") %>%
@@ -502,7 +608,7 @@ From this you can use the `inner_join()` function passing the argument `nrc_fear
 
 ---
 
-**Question 14. Using the `inner_join()` and `count()` functions to create a list of the fear words and their frequencies within your tided text.**
+**Question 18. Using the `inner_join()` and `count()` functions to create a list of the fear words and their frequencies within your tided text.**
 
 ```{r, eval = TRUE, include = params$answers}
 tidy_AAIWL.3 %>% 
@@ -528,7 +634,7 @@ tidy_SCJH.3 %>%
 
 ---
 
-**Question 15. In your groups, discuss the differences in frequencies of these `fear` base, and re-run questions 13 & 14, with different emotions (for example, "joy" and "fear") and compare the frequencies in these different texts.**
+**Question 19. In your groups, discuss the differences in frequencies of these `fear` base, and re-run questions 13 & 14, with different emotions (for example, "joy" and "fear") and compare the frequencies in these different texts.**
 
 ---
 
@@ -540,7 +646,7 @@ One method of calculating and visualizing sentiment is through a line calculatio
 
 ---
 
-**Question 16. Using the combined function: `inner_join(get_sentiments("afinn"))`, apply this to your text to apply the weight to the text.**
+**Question 20. Using the combined function: `inner_join(get_sentiments("afinn"))`, apply this to your text to apply the weight to the text.**
 
 ```{r, eval = TRUE, include = params$answers}
 tidy_AAIWL.3.afinn <- tidy_AAIWL.3 %>% 
@@ -562,9 +668,9 @@ From this you can determine the positive or negative ranking per sentence throug
 
 ---
 
-**Question 17. Run the following code for your tided text, to create a weight per line ranking the positive or negative rating**
+**Question 21. Run the following code for your tided text, to create a weight per line ranking the positive or negative rating**
 
-```{r}
+```{r, eval = FALSE}
 
   group_by(linenumber) %>%
   mutate(sentiments = sum(value)) %>%
@@ -604,7 +710,7 @@ From this, you can create a graph using `ggplot` to display the the relationship
 
 ---
 
-**Question 18. Using your knowledge of `ggplot()`, plot your tidied text to indicate the sentiments per line.**
+**Question 22. Using your knowledge of `ggplot()`, plot your tidied text to indicate the sentiments per line.**
 
 ```{r, eval = TRUE, include = params$answers}
 
@@ -628,9 +734,11 @@ ggplot(data = tidy_SCJH.sent, mapping = aes(x = linenumber, y = sentiments)) +
 
 ---
 
-**Question 19. Discuss in groups the differences between the different texts, can you tell which graph comes from which text?**
+**Question 23. Discuss in groups the differences between the different texts, can you tell which graph comes from which text?**
 
 ---
 
 ---
+
+
 
