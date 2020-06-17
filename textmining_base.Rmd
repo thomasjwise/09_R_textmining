@@ -564,7 +564,7 @@ From this you can determine the positive or negative ranking per sentence throug
 
 **Question 17. Run the following code for your tided text, to create a weight per line ranking the positive or negative rating**
 
-```{r}
+```{r, eval = FALSE}
 
   group_by(linenumber) %>%
   mutate(sentiments = sum(value)) %>%
